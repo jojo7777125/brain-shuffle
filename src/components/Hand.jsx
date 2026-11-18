@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import PlayingCard, { SUITS, RANKS } from './PlayingCard.jsx'
 
 // Measures how wide the hand area is, so the fan fits any screen.
@@ -20,7 +20,7 @@ function useWidth(ref) {
  * Each card's position is plain math: spread them out, tilt them a little,
  * and drop the outer ones slightly so the hand curves like a real one.
  */
-export default function Hand({ tasks, selectedId, onSelect }) {
+export default function Hand({ tasks, played = [], selectedId, onSelect, onToggleDone }) {
   const ref = useRef(null)
   const width = useWidth(ref)
   const [dealt, setDealt] = useState(false)
@@ -63,7 +63,11 @@ export default function Hand({ tasks, selectedId, onSelect }) {
         Aces are for now, Kings for today, Queens for later. Pick a card to look at it.
       </p>
 
-      <div ref={ref} className="relative mt-4" style={{ height }} onKeyDown={onKeyDown}>
+      <div ref={ref} className="relative mt-4" style={{ height: n ? height : 'auto' }} onKeyDown={onKeyDown}>
+        {n === 0 && (
+          <p className="py-6 font-display text-xl italic text-white/80">Every card is played. Nice work.</p>
+        )}
+        <AnimatePresence>
         {width > 0 &&
           tasks.map((task, i) => {
             const t = n > 1 ? i / (n - 1) - 0.5 : 0 // -0.5 (left) … 0.5 (right)
@@ -85,6 +89,7 @@ export default function Hand({ tasks, selectedId, onSelect }) {
                 style={{ marginLeft: -cardW / 2, zIndex: i, transformOrigin: '50% 120%' }}
                 initial={{ x: 0, y: -height, rotate: 0, opacity: 0 }}
                 animate={{ x, y, rotate, opacity: 1 }}
+                exit={{ y: y - height * 0.5, opacity: 0, transition: { duration: 0.35 } }} // played: lifts out of the hand
                 whileHover={selected ? undefined : { y: y - 10 }}
                 transition={{
                   type: 'spring',
@@ -97,7 +102,34 @@ export default function Hand({ tasks, selectedId, onSelect }) {
               </motion.button>
             )
           })}
+        </AnimatePresence>
       </div>
+
+      {played.length > 0 && (
+        <div className="mt-4 text-sm">
+          <h3 className="font-display text-lg font-semibold">Played</h3>
+          <ul className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
+            {played.map((t) => (
+              <li key={t.id} className="flex items-baseline gap-2">
+                <button
+                  type="button"
+                  onClick={() => onSelect(t.id)}
+                  className="text-white/70 line-through decoration-white/40 hover:text-white"
+                >
+                  {t.title}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onToggleDone(t.id)}
+                  className="text-white/85 underline decoration-white/35 underline-offset-4 hover:text-white"
+                >
+                  Put back
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }

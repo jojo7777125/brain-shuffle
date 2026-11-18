@@ -14,7 +14,17 @@ export async function sortBrain(dump) {
       const res = await fetch('/api/sort', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dump }),
+        // Your local day and time, so the AI can judge what "tonight" or "tomorrow" means for you.
+        body: JSON.stringify({
+          dump,
+          localTime: new Date().toLocaleString([], {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          }),
+        }),
         signal: controller.signal,
       })
       clearTimeout(timer)

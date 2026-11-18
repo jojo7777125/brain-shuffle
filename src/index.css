@@ -5,8 +5,8 @@
   --font-sans: 'Libre Franklin', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Bodoni Moda', 'Didot', Georgia, serif;
 
-  --color-felt: #1f4d3a; /* the table */
-  --color-felt-deep: #163a2b; /* table edge / pressed */
+  --color-felt: #17663f; /* poker-table green */
+  --color-felt-deep: #0c3f26; /* the table's darker edges */
   --color-stock: #ffffff; /* card stock and paper */
   --color-ink: #231f20; /* printer's black: spades, clubs, text */
   --color-pip: #c8102e; /* card red: hearts, diamonds, the one button */
@@ -21,10 +21,11 @@ html {
 
 body {
   min-height: 100dvh;
-  /* faint weave so the felt doesn't read as a flat fill */
+  /* Poker felt: a lamp-lit centre fading to darker edges, plus a fine grain so it reads as cloth. */
   background:
-    radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 0.06), transparent 60%),
-    var(--color-felt);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 90% 70% at 50% 30%, #1d7a4b 0%, var(--color-felt) 45%, var(--color-felt-deep) 100%);
+  background-attachment: fixed;
 }
 
 :focus-visible {

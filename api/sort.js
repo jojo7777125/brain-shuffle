@@ -33,6 +33,8 @@ Rules:
 - Split combined items into separate tasks. Merge duplicates.
 - minutes: a realistic estimate, one of 5, 10, 15, 30, 45, 60, 90, 120.
 - priority: "now" = urgent or due very soon; "today" = should happen today; "later" = can wait.
+  Use the person's current local time to judge this (e.g. late at night, something due tomorrow morning is "now";
+  something for "this weekend" on a Monday is "later").
 - category: school, work, personal, or errands (shopping, pickups, returns, appointments).
 - Worries, feelings and ideas go in notTasks, not tasks. Keep the person's meaning; tidy the wording.
 - Never invent things that are not in the dump.`
@@ -40,9 +42,12 @@ Rules:
 const client = new Anthropic() // reads ANTHROPIC_API_KEY from the environment
 
 export async function POST(request) {
-  let dump
+  let dump, localTime
   try {
-    dump = String((await request.json())?.dump ?? '').trim()
+    const body = await request.json()
+    dump = String(body?.dump ?? '').trim()
+    // e.g. "Tuesday, November 17, 10:47 PM". Capped in length since it comes from the browser.
+    localTime = String(body?.localTime ?? '').slice(0, 60)
   } catch {
     return Response.json({ error: 'Body must be JSON: { "dump": "..." }' }, { status: 400 })
   }
@@ -54,7 +59,12 @@ export async function POST(request) {
         model: 'claude-opus-5-5',
         max_tokens: 16000,
         system: SYSTEM,
-        messages: [{ role: 'user', content: `BRAIN DUMP:\n"""\n${dump.slice(0, MAX_DUMP)}\n"""` }],
+        messages: [
+          {
+            role: 'user',
+            content: `${localTime ? `Current local time: ${localTime}\n\n` : ''}BRAIN DUMP:\n"""\n${dump.slice(0, MAX_DUMP)}\n"""`,
+          },
+        ],
         output_config: {
           effort: 'low', // simple sorting job: low effort keeps it fast and cheap
           format: betaZodOutputFormat(PlanSchema),
