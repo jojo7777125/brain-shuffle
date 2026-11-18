@@ -13,6 +13,8 @@ import { buildTimeline, roundUpTo5 } from './lib/schedule.js'
 import { loadPlan, savePlan, loadDraft, saveDraft } from './lib/storage.js'
 
 const ORDER = { now: 0, today: 1, later: 2 }
+// Chips you win for playing (finishing) a card. Bigger priorities pay more.
+export const CHIPS = { now: 3, today: 2, later: 1 }
 const byRank = (a, b) => ORDER[a.priority] - ORDER[b.priority]
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 
@@ -38,6 +40,9 @@ export default function App() {
   const selected = tasks.find((t) => t.id === selectedId) ?? hand[0] ?? tasks[0]
   const startsAt = blocks.find((b) => b.type === 'task' && b.task.id === selected?.id)?.start
   const focusTask = tasks.find((t) => t.id === focusId)
+  const chips = played.reduce((sum, t) => sum + CHIPS[t.priority], 0)
+  // "Draw next card": the first unfinished task on today's plan, or else your best card.
+  const nextCard = scheduled.find((t) => !t.done) ?? hand[0]
 
   // Feature 3: save automatically whenever the plan or the unsorted text changes.
   useEffect(() => savePlan(plan), [plan])
@@ -108,8 +113,11 @@ export default function App() {
   function toggleDone(id) {
     const task = tasks.find((t) => t.id === id)
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t)))
-    // Playing the card you're looking at moves you on to your next most important card.
-    if (!task.done && selected?.id === id) setSelectedId(null)
+    if (!task.done) {
+      setNotice({ text: `Played “${task.title}”. +${CHIPS[task.priority]} chips.` })
+      // Playing the card you're looking at moves you on to your next most important card.
+      if (selected?.id === id) setSelectedId(null)
+    }
   }
 
   function deleteTask(id) {
@@ -152,7 +160,16 @@ export default function App() {
         {plan && (
           <header className="mx-auto mb-10 flex max-w-6xl flex-wrap items-center justify-between gap-4">
             <span className="font-display text-2xl font-semibold">Brain Shuffle</span>
-            <div className="flex items-center gap-5">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+              <ChipCount chips={chips} />
+              {nextCard && (
+                <button
+                  onClick={() => setFocusId(nextCard.id)}
+                  className="rounded-[6px] bg-pip px-4 py-2 text-sm font-medium text-white hover:bg-[#a50d26]"
+                >
+                  Draw next card
+                </button>
+              )}
               {!addingMore && (
                 <button
                   onClick={() => setAddingMore(true)}
@@ -285,5 +302,24 @@ export default function App() {
         </AnimatePresence>
       </div>
     </MotionConfig>
+  )
+}
+
+// A little stack of poker chips with your total. Each played card adds to it.
+function ChipCount({ chips }) {
+  return (
+    <span className="flex items-center gap-2" aria-label={`${chips} chips won today`}>
+      <span aria-hidden className="relative h-6 w-6">
+        {[2, 1, 0].map((i) => (
+          <span
+            key={i}
+            className="absolute left-0 h-5 w-5 rounded-full border-[3px] border-dashed border-white bg-pip shadow-[0_1px_0_rgb(0_0_0/0.35)]"
+            style={{ top: i * 2 }}
+          />
+        ))}
+      </span>
+      <span className="font-display text-lg font-semibold tabular-nums">{chips}</span>
+      <span className="text-sm text-white/70">chips</span>
+    </span>
   )
 }

@@ -102,7 +102,10 @@ function CardFace({ task }) {
   )
 }
 
-// Classic red card back: a fine lattice inside a white border.
+// Classic red card back: a fine lattice inside a white border. Shared with the landing pile.
+export const BACK_PATTERN =
+  'rounded-[0.3em] bg-[#8e1b2a] bg-[repeating-linear-gradient(45deg,rgb(255_255_255/0.14)_0_1px,transparent_1px_0.5em),repeating-linear-gradient(-45deg,rgb(255_255_255/0.14)_0_1px,transparent_1px_0.5em)] ring-1 ring-[#8e1b2a] ring-offset-[0.15em] ring-offset-stock'
+
 function CardBack() {
   return (
     <div
@@ -110,7 +113,7 @@ function CardBack() {
       style={{ ...sideStyle, transform: 'rotateY(180deg)' }}
       className="absolute inset-0 rounded-[0.6em] bg-stock p-[0.4em] shadow-[0_0_0_1px_rgb(0_0_0/0.08),0_0.7em_1.4em_-0.5em_rgb(0_0_0/0.55)]"
     >
-      <div className="h-full w-full rounded-[0.3em] bg-[#8e1b2a] bg-[repeating-linear-gradient(45deg,rgb(255_255_255/0.14)_0_1px,transparent_1px_0.5em),repeating-linear-gradient(-45deg,rgb(255_255_255/0.14)_0_1px,transparent_1px_0.5em)] ring-1 ring-[#8e1b2a] ring-offset-[0.15em] ring-offset-stock" />
+      <div className={`h-full w-full ${BACK_PATTERN}`} />
     </div>
   )
 }

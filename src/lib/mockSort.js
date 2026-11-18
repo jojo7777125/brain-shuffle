@@ -39,11 +39,16 @@ function tidy(text) {
   return t.charAt(0).toUpperCase() + t.slice(1)
 }
 
-export function mockSort(dump) {
-  const pieces = (dump.trim() || SAMPLE_DUMP)
+// Breaks a dump into separate thoughts: one per line or sentence.
+// Also used by the landing screen to drop one card per thought onto the table.
+export const splitThoughts = (text) =>
+  text
     .split(/\n|;|•|(?<=[.?!])\s+/)
     .map((s) => s.replace(/^[-*\d.)\s]+/, '').trim())
     .filter((s) => s.length > 2)
+
+export function mockSort(dump) {
+  const pieces = splitThoughts(dump.trim() || SAMPLE_DUMP)
 
   const tasks = []
   const notTasks = []
