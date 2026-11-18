@@ -1,4 +1,5 @@
 import { motion } from 'motion/react'
+import MicButton from './MicButton.jsx'
 
 // Feature 4: a small writing slip for new thoughts, shuffled into your current hand.
 export default function AddMore({ value, onChange, onSubmit, onCancel, busy }) {
@@ -32,7 +33,10 @@ export default function AddMore({ value, onChange, onSubmit, onCancel, busy }) {
         placeholder="Oh, and I also need to…"
         className="mt-2 block h-32 w-full resize-none bg-transparent px-6 py-2 text-lg leading-relaxed outline-none"
       />
-      <div className="flex items-center justify-end gap-5 border-t border-rule px-6 py-4">
+      <div className="flex flex-wrap items-center justify-end gap-5 border-t border-rule px-6 py-4">
+        <span className="mr-auto">
+          <MicButton value={value} onChange={onChange} disabled={busy} />
+        </span>
         <button
           type="button"
           onClick={onCancel}

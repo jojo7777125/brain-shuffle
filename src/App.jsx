@@ -8,6 +8,7 @@ import Spotlight from './components/Spotlight.jsx'
 import Timeline from './components/Timeline.jsx'
 import NotTasks from './components/NotTasks.jsx'
 import PlayZone from './components/PlayZone.jsx'
+import CashOut from './components/CashOut.jsx'
 import { SUITS } from './components/PlayingCard.jsx'
 import * as sfx from './lib/sfx.js'
 import { sortBrain } from './lib/sortBrain.js'
@@ -33,6 +34,7 @@ export default function App() {
   const [dragging, setDragging] = useState(false) // a card is being dragged (lights up the play zone)
   const [lastWin, setLastWin] = useState(null) // the "+3 chips" that floats up after playing
   const [soundOn, setSoundOn] = useState(() => !sfx.isMuted())
+  const [cashingOut, setCashingOut] = useState(false) // the end-of-day recap is open
   const playZoneRef = useRef(null)
 
   // Everything below is derived from the plan: plan.tasks is the single list we change.
@@ -195,6 +197,14 @@ export default function App() {
                   Draw next card
                 </button>
               )}
+              {played.length > 0 && (
+                <button
+                  onClick={() => setCashingOut(true)}
+                  className="rounded-[6px] border border-white/40 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
+                >
+                  Cash out
+                </button>
+              )}
               {!addingMore && (
                 <button
                   onClick={() => setAddingMore(true)}
@@ -325,6 +335,33 @@ export default function App() {
               onDone={() => {
                 toggleDone(focusTask.id)
                 setFocusId(null)
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {cashingOut && (
+            <CashOut
+              played={played}
+              left={hand}
+              chips={chips}
+              onClose={() => setCashingOut(false)}
+              onNewDump={() => {
+                setCashingOut(false)
+                startOver()
+              }}
+              onCarryOver={() => {
+                // Clear the played pile (chips go back to 0) and keep the unplayed cards for a fresh day.
+                setPlan((p) => ({
+                  ...p,
+                  tasks: p.tasks.filter((t) => !t.done),
+                  startAt: roundUpTo5(new Date()),
+                  finishBy: null,
+                }))
+                setSelectedId(null)
+                setCashingOut(false)
+                setNotice({ text: `New round. ${plural(hand.length, 'card')} still in your hand.` })
               }}
             />
           )}

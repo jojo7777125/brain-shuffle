@@ -1,6 +1,7 @@
 import { motion } from 'motion/react'
 import { SAMPLE_DUMP, splitThoughts } from '../lib/mockSort.js'
 import ThoughtPile from './ThoughtPile.jsx'
+import MicButton from './MicButton.jsx'
 
 const STEPS = [
   { suit: '♠', red: false, title: 'Dump it', text: 'Type everything on your mind. Messy is fine.' },
@@ -51,15 +52,18 @@ export default function DumpBox({ value, onChange, onSort, sorting }) {
             placeholder="What's on your mind? Dump it all here."
             className="block h-56 w-full resize-none rounded-t-[10px] bg-transparent px-6 pt-6 pb-4 text-lg leading-relaxed outline-none sm:h-64"
           />
-          <div className="flex items-center justify-between gap-4 border-t border-rule px-6 py-4">
-            <button
-              type="button"
-              onClick={() => onChange(SAMPLE_DUMP)}
-              disabled={sorting}
-              className="text-sm text-ink/60 underline decoration-ink/25 underline-offset-4 hover:text-ink"
-            >
-              Fill in an example
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-rule px-6 py-4">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <MicButton value={value} onChange={onChange} disabled={sorting} />
+              <button
+                type="button"
+                onClick={() => onChange(SAMPLE_DUMP)}
+                disabled={sorting}
+                className="text-sm text-ink/60 underline decoration-ink/25 underline-offset-4 hover:text-ink"
+              >
+                Fill in an example
+              </button>
+            </div>
             <button
               type="button"
               onClick={onSort}
