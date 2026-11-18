@@ -1,0 +1,37 @@
+@import 'tailwindcss';
+
+/* A classic card table. Every color in the app comes from this list. */
+@theme {
+  --font-sans: 'Libre Franklin', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bodoni Moda', 'Didot', Georgia, serif;
+
+  --color-felt: #1f4d3a; /* the table */
+  --color-felt-deep: #163a2b; /* table edge / pressed */
+  --color-stock: #ffffff; /* card stock and paper */
+  --color-ink: #231f20; /* printer's black: spades, clubs, text */
+  --color-pip: #c8102e; /* card red: hearts, diamonds, the one button */
+  --color-rule: #e4e0d8; /* hairlines on paper */
+}
+
+html {
+  background: var(--color-felt);
+  color: var(--color-stock);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100dvh;
+  /* faint weave so the felt doesn't read as a flat fill */
+  background:
+    radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 0.06), transparent 60%),
+    var(--color-felt);
+}
+
+:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+textarea::placeholder {
+  color: #8a8580;
+}
