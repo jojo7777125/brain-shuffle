@@ -7,14 +7,16 @@ import Timeline from './components/Timeline.jsx'
 import NotTasks from './components/NotTasks.jsx'
 import { sortBrain } from './lib/sortBrain.js'
 import { buildTimeline, roundUpTo5 } from './lib/schedule.js'
+import { loadPlan, savePlan, loadDraft, saveDraft } from './lib/storage.js'
 
 const ORDER = { now: 0, today: 1, later: 2 }
 const byRank = (a, b) => ORDER[a.priority] - ORDER[b.priority]
 
 export default function App() {
-  const [dump, setDump] = useState('')
+  // Feature 3: start from whatever was saved in this browser last time.
+  const [dump, setDump] = useState(loadDraft)
   const [sorting, setSorting] = useState(false)
-  const [plan, setPlan] = useState(null) // { tasks, notTasks, source, startedAt }
+  const [plan, setPlan] = useState(loadPlan) // { tasks, notTasks, source, startAt, finishBy }
   const [selectedId, setSelectedId] = useState(null)
   const [deleted, setDeleted] = useState(null) // { task, index } for "Undo"
 
@@ -29,6 +31,10 @@ export default function App() {
   )
   const selected = tasks.find((t) => t.id === selectedId) ?? hand[0] ?? tasks[0]
   const startsAt = blocks.find((b) => b.type === 'task' && b.task.id === selected?.id)?.start
+
+  // Feature 3: save automatically whenever the plan or the unsorted text changes.
+  useEffect(() => savePlan(plan), [plan])
+  useEffect(() => saveDraft(dump), [dump])
 
   // The "Deleted … Undo" note disappears after a few seconds.
   useEffect(() => {
@@ -48,6 +54,7 @@ export default function App() {
       finishBy: null, // optional "I need to be done by" time
     })
     setSelectedId(null)
+    setDump('') // it's sorted now, so the draft isn't needed
     setSorting(false)
   }
 
