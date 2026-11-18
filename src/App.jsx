@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import DumpBox from './components/DumpBox.jsx'
 import AddMore from './components/AddMore.jsx'
@@ -7,6 +7,9 @@ import Hand from './components/Hand.jsx'
 import Spotlight from './components/Spotlight.jsx'
 import Timeline from './components/Timeline.jsx'
 import NotTasks from './components/NotTasks.jsx'
+import PlayZone from './components/PlayZone.jsx'
+import { SUITS } from './components/PlayingCard.jsx'
+import * as sfx from './lib/sfx.js'
 import { sortBrain } from './lib/sortBrain.js'
 import { mergePlan } from './lib/merge.js'
 import { buildTimeline, roundUpTo5 } from './lib/schedule.js'
@@ -27,6 +30,10 @@ export default function App() {
   const [addingMore, setAddingMore] = useState(false)
   const [notice, setNotice] = useState(null) // { text, action?: { label, run } } shown at the bottom
   const [focusId, setFocusId] = useState(null) // the card open in focus mode
+  const [dragging, setDragging] = useState(false) // a card is being dragged (lights up the play zone)
+  const [lastWin, setLastWin] = useState(null) // the "+3 chips" that floats up after playing
+  const [soundOn, setSoundOn] = useState(() => !sfx.isMuted())
+  const playZoneRef = useRef(null)
 
   // Everything below is derived from the plan: plan.tasks is the single list we change.
   const tasks = useMemo(() => plan?.tasks ?? [], [plan])
@@ -114,7 +121,10 @@ export default function App() {
     const task = tasks.find((t) => t.id === id)
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t)))
     if (!task.done) {
-      setNotice({ text: `Played “${task.title}”. +${CHIPS[task.priority]} chips.` })
+      // Playing a card: it lands on the table, chips clink, "+3 chips" floats up.
+      sfx.flick()
+      sfx.clink()
+      setLastWin({ key: `${id}-${Date.now()}`, chips: CHIPS[task.priority] })
       // Playing the card you're looking at moves you on to your next most important card.
       if (selected?.id === id) setSelectedId(null)
     }
@@ -162,9 +172,24 @@ export default function App() {
             <span className="font-display text-2xl font-semibold">Brain Shuffle</span>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
               <ChipCount chips={chips} />
+              <button
+                type="button"
+                aria-pressed={soundOn}
+                aria-label={soundOn ? 'Sound on. Turn sound off.' : 'Sound off. Turn sound on.'}
+                onClick={() => {
+                  sfx.setMuted(soundOn)
+                  setSoundOn(!soundOn)
+                }}
+                className="grid h-9 w-9 place-items-center rounded-[6px] text-white/80 hover:bg-white/10 hover:text-white"
+              >
+                <SoundIcon on={soundOn} />
+              </button>
               {nextCard && (
                 <button
-                  onClick={() => setFocusId(nextCard.id)}
+                  onClick={() => {
+                    sfx.flick()
+                    setFocusId(nextCard.id)
+                  }}
                   className="rounded-[6px] bg-pip px-4 py-2 text-sm font-medium text-white hover:bg-[#a50d26]"
                 >
                   Draw next card
@@ -196,8 +221,8 @@ export default function App() {
                 sorting={sorting}
               />
             ) : (
-              // Phones: card, hand, then the day. Wide screens: card beside the day, hand underneath.
-              <div key="plan" className="space-y-14">
+              // Bottom padding leaves room for the hand, which stays fixed at the bottom of the screen.
+              <div key="plan" className="space-y-10 pb-60">
                 <AnimatePresence>
                   {addingMore && (
                     <AddMore
@@ -209,7 +234,28 @@ export default function App() {
                     />
                   )}
                 </AnimatePresence>
-                <div className="grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-x-14 lg:gap-y-16">
+                {/* The dealer (the AI) gives one line on what to play first */}
+                <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b border-white/15 pb-5">
+                  {plan.dealerNote && (
+                    <p className="max-w-3xl font-display text-2xl leading-snug italic sm:text-[1.7rem]">
+                      <span className="mr-2 font-sans text-sm font-medium tracking-normal text-white/60 not-italic">
+                        Dealer
+                      </span>
+                      {plan.dealerNote}
+                    </p>
+                  )}
+                  <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/75">
+                    {Object.entries(SUITS).map(([category, s]) => (
+                      <div key={category} className="flex items-center gap-1.5">
+                        <dt className={s.color === 'text-pip' ? 'text-[#ff9aa8]' : 'text-white'}>{s.symbol}</dt>
+                        <dd>{category}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+
+                {/* The table: the card you're looking at, the play zone, and today's plan */}
+                <div className="grid gap-12 lg:grid-cols-[17rem_minmax(0,1fr)_minmax(0,24rem)] lg:gap-10">
                   {selected ? (
                     <Spotlight
                       task={selected}
@@ -224,7 +270,16 @@ export default function App() {
                       Your hand is empty. Add more, or start a new dump.
                     </p>
                   )}
-                  <div className="order-3 lg:order-2">
+                  <PlayZone
+                    zoneRef={playZoneRef}
+                    dragging={dragging}
+                    played={played}
+                    chips={chips}
+                    lastWin={lastWin}
+                    onSelect={setSelectedId}
+                    onPutBack={toggleDone}
+                  />
+                  <div>
                     <Timeline
                       blocks={blocks}
                       tasks={scheduled}
@@ -239,18 +294,17 @@ export default function App() {
                       onMove={moveToday}
                     />
                   </div>
-                  {tasks.length > 0 && (
-                    <div className="order-2 lg:order-3 lg:col-span-2">
-                      <Hand
-                        tasks={hand}
-                        played={played}
-                        selectedId={selected?.id}
-                        onSelect={setSelectedId}
-                        onToggleDone={toggleDone}
-                      />
-                    </div>
-                  )}
                 </div>
+                {tasks.length > 0 && (
+                  <Hand
+                    tasks={hand}
+                    selectedId={selected?.id}
+                    onSelect={setSelectedId}
+                    onPlay={toggleDone}
+                    playZoneRef={playZoneRef}
+                    onDragChange={setDragging}
+                  />
+                )}
                 <NotTasks notTasks={plan.notTasks} />
                 {plan.source === 'mock' && (
                   <p className="text-sm text-white/55">
@@ -280,10 +334,10 @@ export default function App() {
           {notice && (
             <motion.div
               role="status"
-              initial={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 0, y: -16 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 16 }}
-              className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md items-center justify-between gap-4 rounded-[8px] bg-stock px-4 py-3 text-ink shadow-[0_12px_32px_-8px_rgb(0_0_0/0.5)]"
+              exit={{ opacity: 0, y: -16 }}
+              className="fixed inset-x-4 top-4 z-50 mx-auto flex max-w-md items-center justify-between gap-4 rounded-[8px] bg-stock px-4 py-3 text-ink shadow-[0_12px_32px_-8px_rgb(0_0_0/0.5)]"
             >
               <span className="truncate text-sm">{notice.text}</span>
               {notice.action && (
@@ -321,5 +375,21 @@ function ChipCount({ chips }) {
       <span className="font-display text-lg font-semibold tabular-nums">{chips}</span>
       <span className="text-sm text-white/70">chips</span>
     </span>
+  )
+}
+
+function SoundIcon({ on }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
+      {on ? (
+        <>
+          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+          <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+        </>
+      ) : (
+        <path d="m16 9 5 6m0-6-5 6" />
+      )}
+    </svg>
   )
 }

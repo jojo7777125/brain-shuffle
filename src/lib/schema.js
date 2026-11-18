@@ -60,5 +60,7 @@ export function normalizePlan(raw, { allowEmpty = false } = {}) {
     .slice(0, 40)
 
   if (!tasks.length && !notTasks.length && !allowEmpty) throw new Error('AI response had no tasks or notes')
-  return { tasks, notTasks }
+  // The dealer's one-line tip (optional).
+  const dealerNote = clean(raw.dealerNote).slice(0, 180)
+  return { tasks, notTasks, dealerNote }
 }

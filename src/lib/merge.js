@@ -41,7 +41,13 @@ export function mergePlan(plan, addition) {
   }
 
   return {
-    plan: { ...plan, tasks, notTasks: [...plan.notTasks, ...newNotes] },
+    // The dealer reacts to the new cards; if there were none, keep the old tip.
+    plan: {
+      ...plan,
+      tasks,
+      notTasks: [...plan.notTasks, ...newNotes],
+      dealerNote: (newTasks.length && addition.dealerNote) || plan.dealerNote,
+    },
     added: { tasks: newTasks, notTasks: newNotes },
   }
 }

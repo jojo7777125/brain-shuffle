@@ -69,5 +69,9 @@ export function mockSort(dump) {
               : 'personal',
       })
   }
-  return normalizePlan({ tasks, notTasks })
+  // The offline dealer is simple: point at your most urgent card.
+  const first = tasks.find((t) => t.priority === 'now') ?? tasks.find((t) => t.priority === 'today') ?? tasks[0]
+  const rankName = { now: 'Ace', today: 'King', later: 'Queen' }
+  const dealerNote = first ? `Play your ${rankName[first.priority]} first: ${first.title.toLowerCase()}.` : ''
+  return normalizePlan({ tasks, notTasks, dealerNote })
 }

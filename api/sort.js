@@ -23,6 +23,7 @@ const PlanSchema = z.object({
       kind: z.enum(NOTE_KINDS),
     }),
   ),
+  dealerNote: z.string(),
 })
 
 const SYSTEM = `You are a calm, practical planning assistant for a busy teenager.
@@ -37,7 +38,11 @@ Rules:
   something for "this weekend" on a Monday is "later").
 - category: school, work, personal, or errands (shopping, pickups, returns, appointments).
 - Worries, feelings and ideas go in notTasks, not tasks. Keep the person's meaning; tidy the wording.
-- Never invent things that are not in the dump.`
+- Never invent things that are not in the dump.
+- dealerNote: you are also the card dealer at their table. Write ONE short sentence (max 20 words) in a calm,
+  friendly dealer's voice that tells them which card to play first and why, using the real task name.
+  Card language: tasks are cards, "now" = Ace, "today" = King, "later" = Queen. No emojis, no exclamation marks.
+  If some tasks were already on their list, react only to what is new.`
 
 const client = new Anthropic() // reads ANTHROPIC_API_KEY from the environment
 

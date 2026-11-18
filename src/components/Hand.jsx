@@ -1,42 +1,58 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import PlayingCard, { SUITS, RANKS } from './PlayingCard.jsx'
+import * as sfx from '../lib/sfx.js'
 
-// Measures how wide the hand area is, so the fan fits any screen.
-function useWidth(ref) {
-  const [width, setWidth] = useState(0)
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [ref])
-  return width
+function useViewportWidth() {
+  const [w, setW] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const on = () => setW(window.innerWidth)
+    window.addEventListener('resize', on)
+    return () => window.removeEventListener('resize', on)
+  }, [])
+  return w
 }
 
 /**
- * Your tasks held as a fanned hand of cards.
- * Each card's position is plain math: spread them out, tilt them a little,
- * and drop the outer ones slightly so the hand curves like a real one.
+ * Your hand, held at the bottom of the screen like in a card game.
+ * Cards peek up from the edge; hover to lift one, tap to look at it,
+ * drag it onto the table's play zone to play it.
+ * Each card's spot is plain math: spread out, tilted a little, outer ones lower so the hand curves.
  */
-export default function Hand({ tasks, played = [], selectedId, onSelect, onToggleDone }) {
-  const ref = useRef(null)
-  const width = useWidth(ref)
+export default function Hand({ tasks, selectedId, onSelect, onPlay, playZoneRef, onDragChange }) {
+  const vw = useViewportWidth()
   const [dealt, setDealt] = useState(false)
+  const [draggingId, setDraggingId] = useState(null)
+  const seen = useRef(0)
 
   const n = tasks.length
-  const cardW = width < 480 ? 86 : width < 900 ? 108 : 126
-  // tilted cards stick out wider than they are, so leave extra room at the edges
-  const spacing = n > 1 ? Math.min(cardW * 0.66, (width - cardW * 1.65) / (n - 1)) : 0
-  const spread = Math.min(5 * (n - 1), 40) // total tilt across the hand, in degrees
-  const height = cardW * 1.4 + cardW * 0.45 + 24
+  const cardW = vw < 640 ? 84 : vw < 1024 ? 108 : 128
+  const cardH = cardW * 1.4
+  const room = Math.min(vw, 1152) - 32
+  const spacing = n > 1 ? Math.min(cardW * 0.62, (room - cardW * 1.65) / (n - 1)) : 0
+  const spread = Math.min(5 * (n - 1), 36) // total tilt across the hand, in degrees
+  const sink = cardH * 0.4 // how far resting cards sit below the screen edge
 
-  // After the deal finishes, card moves (like picking one) should be instant, not delayed.
+  // Deal sound for new cards (on the first sort, and when "Add more" brings more).
+  useEffect(() => {
+    if (n > seen.current) sfx.deal(n - seen.current)
+    seen.current = n
+  }, [n])
+
+  // After the deal, picking a card should move instantly, not wait its turn.
   useEffect(() => {
     const t = setTimeout(() => setDealt(true), n * 90 + 900)
     return () => clearTimeout(t)
   }, [n])
+
+  // Was the card let go over the play zone?
+  function droppedOnZone(point) {
+    const zone = playZoneRef.current?.getBoundingClientRect()
+    if (!zone) return false
+    const x = point.x - window.scrollX
+    const y = point.y - window.scrollY
+    return x > zone.left && x < zone.right && y > zone.top && y < zone.bottom
+  }
 
   function onKeyDown(e) {
     const i = tasks.findIndex((t) => t.id === selectedId)
@@ -45,91 +61,71 @@ export default function Hand({ tasks, played = [], selectedId, onSelect, onToggl
   }
 
   return (
-    <section aria-labelledby="hand">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <h2 id="hand" className="font-display text-3xl font-semibold">
-          Your hand
-        </h2>
-        <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/75">
-          {Object.entries(SUITS).map(([category, s]) => (
-            <div key={category} className="flex items-center gap-1.5">
-              <dt className={s.color === 'text-pip' ? 'text-[#ff9aa8]' : 'text-white'}>{s.symbol}</dt>
-              <dd>{category}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-      <p className="mt-1 text-sm text-white/65">
-        Aces are for now, Kings for today, Queens for later. Pick a card to look at it.
-      </p>
+    <div
+      role="group"
+      aria-label="Your hand. Pick a card to look at it; drag one onto the table to play it."
+      onKeyDown={onKeyDown}
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-30 bg-gradient-to-t from-felt-deep/90 via-felt-deep/40 to-transparent"
+      style={{ height: cardH * 0.95 }}
+    >
+      {n === 0 && (
+        <p className="absolute inset-x-0 bottom-6 text-center font-display text-xl italic text-white/80">
+          Every card is played. Nice work.
+        </p>
+      )}
+      <AnimatePresence>
+        {tasks.map((task, i) => {
+          const t = n > 1 ? i / (n - 1) - 0.5 : 0 // -0.5 (left) … 0.5 (right)
+          const selected = task.id === selectedId
+          const x = (i - (n - 1) / 2) * spacing
+          const y = sink + t * t * cardW * 0.45 - (selected ? sink + 10 : 0)
+          const suit = SUITS[task.category]
+          const rank = RANKS[task.priority]
 
-      <div ref={ref} className="relative mt-4" style={{ height: n ? height : 'auto' }} onKeyDown={onKeyDown}>
-        {n === 0 && (
-          <p className="py-6 font-display text-xl italic text-white/80">Every card is played. Nice work.</p>
-        )}
-        <AnimatePresence>
-        {width > 0 &&
-          tasks.map((task, i) => {
-            const t = n > 1 ? i / (n - 1) - 0.5 : 0 // -0.5 (left) … 0.5 (right)
-            const selected = task.id === selectedId
-            const x = (i - (n - 1) / 2) * spacing
-            const y = t * t * cardW * 0.5 - (selected ? cardW * 0.3 : 0)
-            const rotate = t * spread
-            const suit = SUITS[task.category]
-            const rank = RANKS[task.priority]
-
-            return (
+          return (
+            <motion.div
+              key={task.id}
+              className="pointer-events-auto absolute bottom-0 left-1/2"
+              style={{
+                marginLeft: -cardW / 2,
+                zIndex: draggingId === task.id ? 100 : i,
+                transformOrigin: '50% 130%',
+              }}
+              initial={{ x: 0, y: -window.innerHeight * 0.5, rotate: 0, opacity: 0 }}
+              animate={{ x, y, rotate: t * spread, opacity: 1 }}
+              exit={{ y: -cardH, opacity: 0, transition: { duration: 0.35 } }}
+              whileHover={selected || draggingId ? undefined : { y: y - sink * 0.6 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 28, delay: dealt ? 0 : 0.09 * i }}
+            >
               <motion.button
-                key={task.id}
                 type="button"
                 aria-pressed={selected}
                 aria-label={`${rank.name} of ${suit.name}: ${task.title}`}
-                onClick={() => onSelect(task.id)}
-                className="absolute bottom-3 left-1/2 rounded-[10px] focus-visible:outline-offset-4"
-                style={{ marginLeft: -cardW / 2, zIndex: i, transformOrigin: '50% 120%' }}
-                initial={{ x: 0, y: -height, rotate: 0, opacity: 0 }}
-                animate={{ x, y, rotate, opacity: 1 }}
-                exit={{ y: y - height * 0.5, opacity: 0, transition: { duration: 0.35 } }} // played: lifts out of the hand
-                whileHover={selected ? undefined : { y: y - 10 }}
-                transition={{
-                  type: 'spring',
-                  stiffness: 280,
-                  damping: 28,
-                  delay: dealt ? 0 : 0.09 * i,
+                className="block cursor-grab rounded-[10px] focus-visible:outline-offset-4 active:cursor-grabbing"
+                style={{ touchAction: 'none' }}
+                drag
+                dragSnapToOrigin
+                dragElastic={0.6}
+                whileDrag={{ scale: 1.08 }}
+                onTap={() => onSelect(task.id)}
+                onKeyDown={(e) => e.key === 'Enter' && onSelect(task.id)}
+                onDragStart={() => {
+                  setDraggingId(task.id)
+                  onDragChange(true)
+                  sfx.flick()
+                }}
+                onDragEnd={(e, info) => {
+                  setDraggingId(null)
+                  onDragChange(false)
+                  if (droppedOnZone(info.point)) onPlay(task.id)
                 }}
               >
                 <PlayingCard task={task} width={cardW} flipDelay={0.09 * i + 0.35} />
               </motion.button>
-            )
-          })}
-        </AnimatePresence>
-      </div>
-
-      {played.length > 0 && (
-        <div className="mt-4 text-sm">
-          <h3 className="font-display text-lg font-semibold">Played</h3>
-          <ul className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
-            {played.map((t) => (
-              <li key={t.id} className="flex items-baseline gap-2">
-                <button
-                  type="button"
-                  onClick={() => onSelect(t.id)}
-                  className="text-white/70 line-through decoration-white/40 hover:text-white"
-                >
-                  {t.title}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onToggleDone(t.id)}
-                  className="text-white/85 underline decoration-white/35 underline-offset-4 hover:text-white"
-                >
-                  Put back
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </section>
+            </motion.div>
+          )
+        })}
+      </AnimatePresence>
+    </div>
   )
 }

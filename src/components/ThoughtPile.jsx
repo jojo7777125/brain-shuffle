@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { BACK_PATTERN } from './PlayingCard.jsx'
+import * as sfx from '../lib/sfx.js'
 
 // Each card's messy spot in the pile, worked out from its number so it never jumps around while you type.
 const spot = (i) => ({
@@ -25,6 +26,21 @@ export default function ThoughtPile({ thoughts, shuffling }) {
 
   const width = small ? 96 : 172
   const n = thoughts.length
+
+  // A soft flick each time a new thought lands on the pile.
+  const count = useRef(n)
+  useEffect(() => {
+    if (n > count.current) sfx.flick(0, 0.12)
+    count.current = n
+  }, [n])
+
+  // Riffle sounds for as long as the AI is shuffling.
+  useEffect(() => {
+    if (!shuffling) return
+    sfx.riffle()
+    const t = setInterval(() => sfx.riffle(), 700)
+    return () => clearInterval(t)
+  }, [shuffling])
   const first = Math.max(0, n - 12) // only the top 12 are drawn; the rest are underneath
 
   return (

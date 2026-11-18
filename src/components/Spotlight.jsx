@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useMotionTemplate, useMotionValue, useSpring } from 'motion/react'
 import PlayingCard, { SUITS, RANKS } from './PlayingCard.jsx'
 import { formatMinutes, formatTime } from '../lib/schedule.js'
 
@@ -14,7 +14,7 @@ export default function Spotlight({ task, startsAt, onToggleDone, onUpdate, onDe
   const rank = RANKS[task.priority]
 
   return (
-    <section aria-live="polite" className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:gap-8">
+    <section aria-live="polite" className="flex flex-col items-center gap-6 sm:flex-row sm:items-start lg:flex-col lg:items-start">
       <AnimatePresence mode="wait">
         <motion.div
           key={task.id}
@@ -24,7 +24,9 @@ export default function Spotlight({ task, startsAt, onToggleDone, onUpdate, onDe
           transition={{ duration: 0.25 }}
           className="shrink-0"
         >
-          <PlayingCard task={task} width={176} />
+          <Tilt>
+            <PlayingCard task={task} width={176} />
+          </Tilt>
         </motion.div>
       </AnimatePresence>
 
@@ -170,5 +172,51 @@ function EditForm({ task, onSave, onCancel }) {
         </button>
       </div>
     </form>
+  )
+}
+
+// Tilts the card toward your mouse in 3D, with a soft light that follows the pointer,
+// like holding a real card up under a lamp.
+function Tilt({ children }) {
+  const rx = useMotionValue(0)
+  const ry = useMotionValue(0)
+  const gx = useMotionValue(50)
+  const gy = useMotionValue(50)
+  const shine = useMotionValue(0)
+  const rotateX = useSpring(rx, { stiffness: 220, damping: 18 })
+  const rotateY = useSpring(ry, { stiffness: 220, damping: 18 })
+  const opacity = useSpring(shine, { stiffness: 200, damping: 25 })
+  const glare = useMotionTemplate`radial-gradient(circle at ${gx}% ${gy}%, rgb(255 255 255 / 0.55), transparent 55%)`
+
+  function onMove(e) {
+    const r = e.currentTarget.getBoundingClientRect()
+    const px = (e.clientX - r.left) / r.width
+    const py = (e.clientY - r.top) / r.height
+    ry.set((px - 0.5) * 18)
+    rx.set(-(py - 0.5) * 18)
+    gx.set(px * 100)
+    gy.set(py * 100)
+    shine.set(1)
+  }
+  function onLeave() {
+    rx.set(0)
+    ry.set(0)
+    shine.set(0)
+  }
+
+  return (
+    <motion.div
+      onPointerMove={onMove}
+      onPointerLeave={onLeave}
+      style={{ rotateX, rotateY, transformPerspective: 700 }}
+      className="relative"
+    >
+      {children}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-[13px] mix-blend-soft-light"
+        style={{ background: glare, opacity }}
+      />
+    </motion.div>
   )
 }
