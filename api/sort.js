@@ -42,12 +42,16 @@ Rules:
 const client = new Anthropic() // reads ANTHROPIC_API_KEY from the environment
 
 export async function POST(request) {
-  let dump, localTime
+  let dump, localTime, existing
   try {
     const body = await request.json()
     dump = String(body?.dump ?? '').trim()
     // e.g. "Tuesday, November 17, 10:47 PM". Capped in length since it comes from the browser.
     localTime = String(body?.localTime ?? '').slice(0, 60)
+    // Feature 4 ("Add more"): tasks and notes already in the plan, so Claude doesn't repeat them. Also capped.
+    existing = (Array.isArray(body?.existing) ? body.existing : [])
+      .slice(0, 60)
+      .map((t) => String(t).slice(0, 140))
   } catch {
     return Response.json({ error: 'Body must be JSON: { "dump": "..." }' }, { status: 400 })
   }
@@ -62,7 +66,12 @@ export async function POST(request) {
         messages: [
           {
             role: 'user',
-            content: `${localTime ? `Current local time: ${localTime}\n\n` : ''}BRAIN DUMP:\n"""\n${dump.slice(0, MAX_DUMP)}\n"""`,
+            content:
+              (localTime ? `Current local time: ${localTime}\n\n` : '') +
+              (existing.length
+                ? `Already on their list or noted (do NOT include these again as tasks or notes, even if reworded):\n${existing.map((t) => `- ${t}`).join('\n')}\n\n`
+                : '') +
+              `BRAIN DUMP:\n"""\n${dump.slice(0, MAX_DUMP)}\n"""`,
           },
         ],
         output_config: {
@@ -80,7 +89,8 @@ export async function POST(request) {
     if (!response.parsed_output) throw new Error(`No parsed output (stop: ${response.stop_reason})`)
 
     // Belt and braces: our own checker still cleans it up and adds ids.
-    return Response.json(normalizePlan(response.parsed_output))
+    // When adding more, "nothing new" (everything was a repeat) is a valid answer.
+    return Response.json(normalizePlan(response.parsed_output, { allowEmpty: existing.length > 0 }))
   } catch (err) {
     console.error('[api/sort]', err)
     // The browser sees a 502 and switches to the offline sorter.

@@ -35,7 +35,7 @@ const clampMinutes = (n) => Math.min(240, Math.max(5, Math.round(n / 5) * 5))
  * { tasks: [{id,title,minutes,priority,category,done}], notTasks: [{id,text,kind}] }
  * Throws if there is nothing usable.
  */
-export function normalizePlan(raw) {
+export function normalizePlan(raw, { allowEmpty = false } = {}) {
   if (!raw || typeof raw !== 'object') throw new Error('AI response was not an object')
 
   const tasks = (Array.isArray(raw.tasks) ? raw.tasks : [])
@@ -59,6 +59,6 @@ export function normalizePlan(raw) {
     .filter((n) => n.text)
     .slice(0, 40)
 
-  if (!tasks.length && !notTasks.length) throw new Error('AI response had no tasks or notes')
+  if (!tasks.length && !notTasks.length && !allowEmpty) throw new Error('AI response had no tasks or notes')
   return { tasks, notTasks }
 }

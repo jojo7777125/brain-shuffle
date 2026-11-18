@@ -1,12 +1,13 @@
 // The one function the UI calls. It tries the real AI (through OUR server, never directly),
-// and falls back to the mock if anything goes wrong. Returns { plan, source }.
+// and falls back to the offline sorter if anything goes wrong. Returns { plan, source }.
+// `existing` (optional): titles already in your hand, used by "Add more" so nothing repeats.
 import { normalizePlan } from './schema.js'
 import { mockSort } from './mockSort.js'
 
 const FORCE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
-export async function sortBrain(dump) {
+export async function sortBrain(dump, existing = []) {
   if (!FORCE_MOCK) {
     try {
       const controller = new AbortController()
@@ -17,6 +18,7 @@ export async function sortBrain(dump) {
         // Your local day and time, so the AI can judge what "tonight" or "tomorrow" means for you.
         body: JSON.stringify({
           dump,
+          existing,
           localTime: new Date().toLocaleString([], {
             weekday: 'long',
             month: 'long',
@@ -30,7 +32,7 @@ export async function sortBrain(dump) {
       clearTimeout(timer)
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.error || `Server said ${res.status}`)
-      return { plan: normalizePlan(body), source: 'ai' }
+      return { plan: normalizePlan(body, { allowEmpty: existing.length > 0 }), source: 'ai' }
     } catch (err) {
       console.warn('[Brain Shuffle] AI failed, using offline sorter:', err.message)
     }

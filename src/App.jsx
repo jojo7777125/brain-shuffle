@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import DumpBox from './components/DumpBox.jsx'
+import AddMore from './components/AddMore.jsx'
 import Hand from './components/Hand.jsx'
 import Spotlight from './components/Spotlight.jsx'
 import Timeline from './components/Timeline.jsx'
 import NotTasks from './components/NotTasks.jsx'
 import { sortBrain } from './lib/sortBrain.js'
+import { mergePlan } from './lib/merge.js'
 import { buildTimeline, roundUpTo5 } from './lib/schedule.js'
 import { loadPlan, savePlan, loadDraft, saveDraft } from './lib/storage.js'
 
 const ORDER = { now: 0, today: 1, later: 2 }
 const byRank = (a, b) => ORDER[a.priority] - ORDER[b.priority]
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 export default function App() {
   // Feature 3: start from whatever was saved in this browser last time.
@@ -18,7 +21,8 @@ export default function App() {
   const [sorting, setSorting] = useState(false)
   const [plan, setPlan] = useState(loadPlan) // { tasks, notTasks, source, startAt, finishBy }
   const [selectedId, setSelectedId] = useState(null)
-  const [deleted, setDeleted] = useState(null) // { task, index } for "Undo"
+  const [addingMore, setAddingMore] = useState(false)
+  const [notice, setNotice] = useState(null) // { text, action?: { label, run } } shown at the bottom
 
   // Everything below is derived from the plan: plan.tasks is the single list we change.
   const tasks = useMemo(() => plan?.tasks ?? [], [plan])
@@ -36,12 +40,12 @@ export default function App() {
   useEffect(() => savePlan(plan), [plan])
   useEffect(() => saveDraft(dump), [dump])
 
-  // The "Deleted … Undo" note disappears after a few seconds.
+  // The note at the bottom disappears after a few seconds.
   useEffect(() => {
-    if (!deleted) return
-    const t = setTimeout(() => setDeleted(null), 6000)
+    if (!notice) return
+    const t = setTimeout(() => setNotice(null), 6000)
     return () => clearTimeout(t)
-  }, [deleted])
+  }, [notice])
 
   async function handleSort() {
     setSorting(true)
@@ -58,10 +62,38 @@ export default function App() {
     setSorting(false)
   }
 
+  // Feature 4: sort only the new text, then shuffle it into the current plan.
+  async function handleAddMore() {
+    setSorting(true)
+    // Tell the AI everything already in the plan (cards and notes) so it doesn't repeat any of it.
+    const { plan: addition, source } = await sortBrain(dump, [
+      ...tasks.map((t) => t.title),
+      ...plan.notTasks.map((n) => n.text),
+    ])
+    const { plan: merged, added } = mergePlan(plan, addition)
+    setPlan({ ...merged, source: source === 'mock' ? 'mock' : plan.source })
+    if (added.tasks[0]) setSelectedId(added.tasks[0].id) // show the first new card
+    setNotice({
+      text:
+        added.tasks.length || added.notTasks.length
+          ? `Added ${[
+              added.tasks.length && plural(added.tasks.length, 'card'),
+              added.notTasks.length && plural(added.notTasks.length, 'note'),
+            ]
+              .filter(Boolean)
+              .join(' and ')}.`
+          : 'Nothing new: all of that is already in your hand.',
+    })
+    setDump('')
+    setAddingMore(false)
+    setSorting(false)
+  }
+
   function startOver() {
     setPlan(null)
     setDump('')
-    setDeleted(null)
+    setAddingMore(false)
+    setNotice(null)
   }
 
   // ---- Feature 2: change the plan ----
@@ -79,16 +111,19 @@ export default function App() {
 
   function deleteTask(id) {
     const index = tasks.findIndex((t) => t.id === id)
-    setDeleted({ task: tasks[index], index })
+    const task = tasks[index]
     setTasks((ts) => ts.filter((t) => t.id !== id))
     if (selectedId === id) setSelectedId(null)
-  }
-
-  function undoDelete() {
-    const { task, index } = deleted
-    setTasks((ts) => [...ts.slice(0, index), task, ...ts.slice(index)])
-    setSelectedId(task.id)
-    setDeleted(null)
+    setNotice({
+      text: `Deleted “${task.title}”.`,
+      action: {
+        label: 'Undo',
+        run: () => {
+          setTasks((ts) => [...ts.slice(0, index), task, ...ts.slice(index)])
+          setSelectedId(task.id)
+        },
+      },
+    })
   }
 
   // Dragging on the Today sheet hands us the new order of the scheduled tasks.
@@ -105,19 +140,28 @@ export default function App() {
     reorderToday(list)
   }
 
+  const link = 'text-sm text-white/75 underline decoration-white/30 underline-offset-4 hover:text-white'
+
   return (
     // reducedMotion="user": people who turn off animations in their OS get no dealing animation
     <MotionConfig reducedMotion="user">
       <div className="min-h-dvh overflow-x-hidden px-4 py-8 sm:px-8 sm:py-12">
         {plan && (
-          <header className="mx-auto mb-10 flex max-w-6xl items-baseline justify-between">
+          <header className="mx-auto mb-10 flex max-w-6xl flex-wrap items-center justify-between gap-4">
             <span className="font-display text-2xl font-semibold">Brain Shuffle</span>
-            <button
-              onClick={startOver}
-              className="text-sm text-white/75 underline decoration-white/30 underline-offset-4 hover:text-white"
-            >
-              Start a new dump
-            </button>
+            <div className="flex items-center gap-5">
+              {!addingMore && (
+                <button
+                  onClick={() => setAddingMore(true)}
+                  className="rounded-[6px] bg-stock px-4 py-2 text-sm font-medium text-ink hover:bg-white/90"
+                >
+                  Add more
+                </button>
+              )}
+              <button onClick={startOver} className={link}>
+                Start a new dump
+              </button>
+            </div>
           </header>
         )}
 
@@ -134,6 +178,17 @@ export default function App() {
             ) : (
               // Phones: card, hand, then the day. Wide screens: card beside the day, hand underneath.
               <div key="plan" className="space-y-14">
+                <AnimatePresence>
+                  {addingMore && (
+                    <AddMore
+                      value={dump}
+                      onChange={setDump}
+                      onSubmit={handleAddMore}
+                      onCancel={() => setAddingMore(false)}
+                      busy={sorting}
+                    />
+                  )}
+                </AnimatePresence>
                 <div className="grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-x-14 lg:gap-y-16">
                   {selected ? (
                     <Spotlight
@@ -145,7 +200,7 @@ export default function App() {
                     />
                   ) : (
                     <p className="font-display text-2xl italic text-white/80">
-                      Your hand is empty. Start a new dump when you’re ready.
+                      Your hand is empty. Add more, or start a new dump.
                     </p>
                   )}
                   <div className="order-3 lg:order-2">
@@ -187,7 +242,7 @@ export default function App() {
         </main>
 
         <AnimatePresence>
-          {deleted && (
+          {notice && (
             <motion.div
               role="status"
               initial={{ opacity: 0, y: 16 }}
@@ -195,10 +250,18 @@ export default function App() {
               exit={{ opacity: 0, y: 16 }}
               className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md items-center justify-between gap-4 rounded-[8px] bg-stock px-4 py-3 text-ink shadow-[0_12px_32px_-8px_rgb(0_0_0/0.5)]"
             >
-              <span className="truncate text-sm">Deleted “{deleted.task.title}”.</span>
-              <button onClick={undoDelete} className="shrink-0 text-sm font-semibold text-pip underline underline-offset-4">
-                Undo
-              </button>
+              <span className="truncate text-sm">{notice.text}</span>
+              {notice.action && (
+                <button
+                  onClick={() => {
+                    notice.action.run()
+                    setNotice(null)
+                  }}
+                  className="shrink-0 text-sm font-semibold text-pip underline underline-offset-4"
+                >
+                  {notice.action.label}
+                </button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
