@@ -1,9 +1,9 @@
-import { buildTimeline, formatTime, formatMinutes } from '../lib/schedule.js'
-import { SUITS } from './TaskList.jsx'
+import { formatTime, formatMinutes } from '../lib/schedule.js'
+import { SUITS } from './PlayingCard.jsx'
 
 // Today's plan, written out on a slip of paper like a score sheet.
-export default function Timeline({ tasks, startedAt }) {
-  const blocks = buildTimeline(tasks, startedAt)
+// Picking a row picks that card in your hand.
+export default function Timeline({ blocks, selectedId, onSelect }) {
   const first = blocks[0]
   const last = blocks.at(-1)
 
@@ -21,7 +21,7 @@ export default function Timeline({ tasks, startedAt }) {
         </p>
       ) : (
         <p className="mt-2 text-sm text-ink/65">
-          Nothing needs doing today. Anything urgent you add will show up here.
+          Nothing needs doing today. Aces and Kings you add will show up here.
         </p>
       )}
 
@@ -29,18 +29,23 @@ export default function Timeline({ tasks, startedAt }) {
         <ol className="mt-5 border-t border-ink">
           {blocks.map((b, i) =>
             b.type === 'task' ? (
-              <li
-                key={b.task.id}
-                className="grid grid-cols-[4.5rem_1rem_1fr_auto] items-baseline gap-x-2 border-b border-rule py-3"
-              >
-                <time className="text-sm text-ink/60 tabular-nums">{formatTime(b.start)}</time>
-                <span aria-hidden className={SUITS[b.task.category].color}>
-                  {SUITS[b.task.category].symbol}
-                </span>
-                <span className="leading-snug font-medium">{b.task.title}</span>
-                <span className="font-display text-sm italic text-ink/70">
-                  {formatMinutes(b.task.minutes)}
-                </span>
+              <li key={b.task.id} className="border-b border-rule">
+                <button
+                  type="button"
+                  onClick={() => onSelect(b.task.id)}
+                  className={`grid w-full grid-cols-[4.5rem_1rem_1fr_auto] items-baseline gap-x-2 py-3 text-left transition-colors hover:bg-ink/[0.03] ${
+                    b.task.id === selectedId ? 'bg-ink/[0.05]' : ''
+                  }`}
+                >
+                  <time className="text-sm text-ink/60 tabular-nums">{formatTime(b.start)}</time>
+                  <span aria-hidden className={SUITS[b.task.category].color}>
+                    {SUITS[b.task.category].symbol}
+                  </span>
+                  <span className="leading-snug font-medium">{b.task.title}</span>
+                  <span className="font-display text-sm italic text-ink/70">
+                    {formatMinutes(b.task.minutes)}
+                  </span>
+                </button>
               </li>
             ) : (
               <li
