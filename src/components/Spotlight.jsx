@@ -6,7 +6,7 @@ import { formatMinutes, formatTime } from '../lib/schedule.js'
 const DURATIONS = [5, 10, 15, 30, 45, 60, 90, 120, 180, 240]
 
 // The card you picked, shown large with what it means, plus done / edit / delete.
-export default function Spotlight({ task, startsAt, onToggleDone, onUpdate, onDelete }) {
+export default function Spotlight({ task, startsAt, onToggleDone, onUpdate, onDelete, onFocus }) {
   const [editing, setEditing] = useState(false)
   useEffect(() => setEditing(false), [task.id]) // picking another card closes the editor
 
@@ -64,6 +64,15 @@ export default function Spotlight({ task, startsAt, onToggleDone, onUpdate, onDe
             </dl>
 
             <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+              {!task.done && (
+                <button
+                  type="button"
+                  onClick={() => onFocus(task.id)}
+                  className="rounded-[6px] bg-pip px-4 py-2.5 font-medium text-white transition-colors hover:bg-[#a50d26]"
+                >
+                  Focus
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onToggleDone(task.id)}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import DumpBox from './components/DumpBox.jsx'
 import AddMore from './components/AddMore.jsx'
+import FocusMode from './components/FocusMode.jsx'
 import Hand from './components/Hand.jsx'
 import Spotlight from './components/Spotlight.jsx'
 import Timeline from './components/Timeline.jsx'
@@ -23,6 +24,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null)
   const [addingMore, setAddingMore] = useState(false)
   const [notice, setNotice] = useState(null) // { text, action?: { label, run } } shown at the bottom
+  const [focusId, setFocusId] = useState(null) // the card open in focus mode
 
   // Everything below is derived from the plan: plan.tasks is the single list we change.
   const tasks = useMemo(() => plan?.tasks ?? [], [plan])
@@ -35,6 +37,7 @@ export default function App() {
   )
   const selected = tasks.find((t) => t.id === selectedId) ?? hand[0] ?? tasks[0]
   const startsAt = blocks.find((b) => b.type === 'task' && b.task.id === selected?.id)?.start
+  const focusTask = tasks.find((t) => t.id === focusId)
 
   // Feature 3: save automatically whenever the plan or the unsorted text changes.
   useEffect(() => savePlan(plan), [plan])
@@ -197,6 +200,7 @@ export default function App() {
                       onToggleDone={toggleDone}
                       onUpdate={updateTask}
                       onDelete={deleteTask}
+                      onFocus={setFocusId}
                     />
                   ) : (
                     <p className="font-display text-2xl italic text-white/80">
@@ -240,6 +244,20 @@ export default function App() {
             )}
           </AnimatePresence>
         </main>
+
+        <AnimatePresence>
+          {focusTask && (
+            <FocusMode
+              key={focusTask.id}
+              task={focusTask}
+              onClose={() => setFocusId(null)}
+              onDone={() => {
+                toggleDone(focusTask.id)
+                setFocusId(null)
+              }}
+            />
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {notice && (
