@@ -15,7 +15,7 @@ import { sortBrain } from './lib/sortBrain.js'
 import { mergePlan } from './lib/merge.js'
 import { dealerReact } from './lib/dealer.js'
 import { buildTimeline, roundUpTo5 } from './lib/schedule.js'
-import { loadPlan, savePlan, loadDraft, saveDraft } from './lib/storage.js'
+import { loadPlan, savePlan, loadDraft, saveDraft, loadBank, bankRound } from './lib/storage.js'
 
 const ORDER = { now: 0, today: 1, later: 2 }
 // Chips you win for playing (finishing) a card. Bigger priorities pay more.
@@ -112,7 +112,32 @@ export default function App() {
     setSorting(false)
   }
 
+  // Keyboard shortcuts on the table: ← → pick a card, P plays it, N draws your next card.
+  // Re-attached every render so it always sees the current hand (cheap: it's one listener).
+  useEffect(() => {
+    if (!plan || focusId || cashingOut) return
+    function onKey(e) {
+      const tag = e.target.tagName
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || e.ctrlKey || e.metaKey || e.altKey) return
+      const i = hand.findIndex((t) => t.id === selected?.id)
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        if (!hand.length) return
+        const step = e.key === 'ArrowRight' ? 1 : -1
+        setSelectedId(hand[(i + step + hand.length) % hand.length].id)
+        e.preventDefault()
+      } else if (e.key.toLowerCase() === 'p' && i >= 0) {
+        toggleDone(selected.id)
+      } else if (e.key.toLowerCase() === 'n' && nextCard) {
+        sfx.flick()
+        setFocusId(nextCard.id)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
   function startOver() {
+    bankRound(chips) // the chips you won this round go into your all-time bank
     setPlan(null)
     setDealerLine(null)
     setDump('')
@@ -372,13 +397,16 @@ export default function App() {
               played={played}
               left={hand}
               chips={chips}
+              bank={loadBank()}
               onClose={() => setCashingOut(false)}
               onNewDump={() => {
                 setCashingOut(false)
                 startOver()
               }}
               onCarryOver={() => {
-                // Clear the played pile (chips go back to 0) and keep the unplayed cards for a fresh day.
+                // Bank the chips, clear the played pile, and keep the unplayed cards for a fresh day.
+                bankRound(chips)
+                setDealerLine(null)
                 setPlan((p) => ({
                   ...p,
                   tasks: p.tasks.filter((t) => !t.done),

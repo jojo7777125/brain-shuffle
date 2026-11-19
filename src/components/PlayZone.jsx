@@ -74,6 +74,10 @@ export default function PlayZone({ zoneRef, dragging, played, chips, lastWin, on
           ? `${played.length} played, ${chips} ${chips === 1 ? 'chip' : 'chips'} won`
           : 'Aces win 3 chips, Kings 2, Queens 1.'}
       </p>
+      {/* Keyboard shortcuts (hidden on phones, where there's no keyboard) */}
+      <p className="mt-1 hidden text-xs text-white/50 sm:block">
+        Keys: <kbd>←</kbd> <kbd>→</kbd> pick a card · <kbd>P</kbd> play it · <kbd>N</kbd> draw next
+      </p>
 
       {played.length > 0 && (
         <ul className="mt-3 flex max-w-md flex-wrap justify-center gap-x-5 gap-y-1 text-sm">

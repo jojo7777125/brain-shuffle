@@ -8,7 +8,7 @@ import * as sfx from '../lib/sfx.js'
  * End-of-day recap. Like cashing out at a casino: count your chips,
  * see every card you played, and what's still in your hand for tomorrow.
  */
-export default function CashOut({ played, left, chips, onClose, onNewDump, onCarryOver }) {
+export default function CashOut({ played, left, chips, bank, onClose, onNewDump, onCarryOver }) {
   const minutes = played.reduce((sum, t) => sum + t.minutes, 0)
   const aces = played.filter((t) => t.priority === 'now').length
 
@@ -44,6 +44,19 @@ export default function CashOut({ played, left, chips, onClose, onNewDump, onCar
           <span className="ml-3 text-3xl font-normal text-white/75 sm:text-4xl">{chips === 1 ? 'chip' : 'chips'}</span>
         </h2>
         <p className="mx-auto mt-4 max-w-md font-display text-xl italic text-white/85">{verdict}</p>
+        {/* Your record from earlier rounds, kept in this browser */}
+        {bank.rounds > 0 ? (
+          <p className="mt-3 text-sm text-white/70">
+            {chips > bank.best ? (
+              <span className="mr-2 rounded-[4px] bg-[#ffd76a] px-2 py-0.5 font-semibold text-ink">New best round</span>
+            ) : (
+              <span className="mr-2">Best round: {bank.best}.</span>
+            )}
+            Bank: {bank.total + chips} chips over {bank.rounds + 1} rounds.
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-white/70">Your first round. Every round after this goes in the bank.</p>
+        )}
 
         {/* The cards you played, dealt out one by one */}
         <div className="mt-8 flex flex-wrap justify-center gap-3">

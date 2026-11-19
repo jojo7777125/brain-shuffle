@@ -58,3 +58,29 @@ export function loadDraft() {
     return ''
   }
 }
+
+// The chip bank: your record across rounds. { best, total, rounds }
+const BANK_KEY = 'brain-shuffle:bank:v1'
+
+export function loadBank() {
+  try {
+    const b = JSON.parse(localStorage.getItem(BANK_KEY))
+    if (b && Number.isFinite(b.best) && Number.isFinite(b.total) && Number.isFinite(b.rounds)) return b
+  } catch {
+    /* fall through */
+  }
+  return { best: 0, total: 0, rounds: 0 }
+}
+
+// Called when a round ends (you cash out into a new round, or start a new dump with chips on the table).
+export function bankRound(chips) {
+  const b = loadBank()
+  if (!chips) return b
+  const next = { best: Math.max(b.best, chips), total: b.total + chips, rounds: b.rounds + 1 }
+  try {
+    localStorage.setItem(BANK_KEY, JSON.stringify(next))
+  } catch {
+    /* ignore */
+  }
+  return next
+}
