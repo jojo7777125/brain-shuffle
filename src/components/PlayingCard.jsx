@@ -48,6 +48,12 @@ function CardFace({ task }) {
   const rank = RANKS[task.priority]
   const isAce = rank.letter === 'A'
   const frame = suit.color === 'text-pip' ? 'border-pip/35' : 'border-ink/30'
+  // Longer titles get smaller text so they stay inside the card's frame (and the time stays inside too).
+  // A single long word (like "prescription") also needs smaller text, or it pokes out the sides.
+  const len = task.title.length
+  const longestWord = Math.max(...task.title.split(/\s+/).map((w) => w.length))
+  const titleSize =
+    len > 42 || longestWord > 12 ? 'text-[0.6em]' : len > 26 || longestWord > 9 ? 'text-[0.68em]' : 'text-[0.82em]'
 
   const Index = ({ flip }) => (
     <div
@@ -76,14 +82,14 @@ function CardFace({ task }) {
           <span aria-hidden className={`text-[3.4em] leading-none ${suit.color}`}>
             {suit.symbol}
           </span>
-          <p className="mt-[0.6em] text-[0.82em] leading-snug font-semibold">{task.title}</p>
-          <p className="mt-[0.2em] font-display text-[0.82em] italic">
+          <p className={`mt-[0.5em] line-clamp-2 w-full shrink-0 leading-snug font-semibold break-words hyphens-auto ${titleSize}`}>{task.title}</p>
+          <p className="mt-[0.2em] shrink-0 font-display text-[0.82em] italic">
             {formatMinutes(task.minutes)}
           </p>
         </div>
       ) : (
         <div
-          className={`absolute inset-x-[1.9em] inset-y-[2.2em] flex flex-col items-center justify-center rounded-[0.25em] border px-[0.4em] text-center ${frame}`}
+          className={`absolute inset-x-[1.9em] inset-y-[2.2em] flex flex-col items-center justify-center overflow-hidden rounded-[0.25em] border px-[0.35em] py-[0.4em] text-center ${frame}`}
         >
           {/* faint giant rank letter, where a court card would have its portrait */}
           <span
@@ -92,8 +98,8 @@ function CardFace({ task }) {
           >
             {rank.letter}
           </span>
-          <p className="relative text-[0.82em] leading-snug font-semibold">{task.title}</p>
-          <p className="relative mt-[0.3em] font-display text-[0.82em] italic text-ink/70">
+          <p className={`relative line-clamp-5 w-full leading-snug font-semibold break-words hyphens-auto ${titleSize}`}>{task.title}</p>
+          <p className="relative mt-[0.3em] shrink-0 font-display text-[0.82em] italic text-ink/70">
             {formatMinutes(task.minutes)}
           </p>
         </div>
