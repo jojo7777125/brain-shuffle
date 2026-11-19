@@ -78,12 +78,14 @@ function CardFace({ task }) {
       <Index />
       <Index flip />
       {isAce ? (
-        <div className="absolute inset-x-[1.9em] inset-y-[2.2em] flex flex-col items-center justify-center text-center">
-          <span aria-hidden className={`text-[3.4em] leading-none ${suit.color}`}>
+        // inset 2.1em on the sides keeps the text clear of the corner rank and suit
+        <div className="absolute inset-x-[2.1em] inset-y-[2.2em] flex flex-col items-center justify-center text-center">
+          {/* Longer titles get a smaller center pip, so the words have room for three lines */}
+          <span aria-hidden className={`${len > 14 ? 'text-[2.3em]' : 'text-[3.4em]'} leading-none ${suit.color}`}>
             {suit.symbol}
           </span>
-          <p className={`mt-[0.5em] line-clamp-2 w-full shrink-0 leading-snug font-semibold break-words hyphens-auto ${titleSize}`}>{task.title}</p>
-          <p className="mt-[0.2em] shrink-0 font-display text-[0.82em] italic">
+          <p className={`mt-[0.4em] line-clamp-3 w-full shrink-0 leading-snug font-semibold break-words hyphens-auto ${titleSize}`}>{task.title}</p>
+          <p className="mt-[0.2em] shrink-0 font-display text-[0.74em] whitespace-nowrap italic">
             {formatMinutes(task.minutes)}
           </p>
         </div>

@@ -9,7 +9,8 @@ import Timeline from './components/Timeline.jsx'
 import NotTasks from './components/NotTasks.jsx'
 import PlayZone from './components/PlayZone.jsx'
 import CashOut from './components/CashOut.jsx'
-import { SUITS } from './components/PlayingCard.jsx'
+import Menu from './components/Menu.jsx'
+import SideSheet from './components/SideSheet.jsx'
 import * as sfx from './lib/sfx.js'
 import { sortBrain } from './lib/sortBrain.js'
 import { mergePlan } from './lib/merge.js'
@@ -37,6 +38,7 @@ export default function App() {
   const [soundOn, setSoundOn] = useState(() => !sfx.isMuted())
   const [cashingOut, setCashingOut] = useState(false) // the end-of-day recap is open
   const [dealerLine, setDealerLine] = useState(null) // what the dealer just said about the card you played
+  const [showToday, setShowToday] = useState(false) // the Today sheet slides in over the table
   const playZoneRef = useRef(null)
 
   // Everything below is derived from the plan: plan.tasks is the single list we change.
@@ -115,7 +117,7 @@ export default function App() {
   // Keyboard shortcuts on the table: ← → pick a card, P plays it, N draws your next card.
   // Re-attached every render so it always sees the current hand (cheap: it's one listener).
   useEffect(() => {
-    if (!plan || focusId || cashingOut) return
+    if (!plan || focusId || cashingOut || showToday) return
     function onKey(e) {
       const tag = e.target.tagName
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || e.ctrlKey || e.metaKey || e.altKey) return
@@ -203,8 +205,6 @@ export default function App() {
     reorderToday(list)
   }
 
-  const link = 'text-sm text-white/75 underline decoration-white/30 underline-offset-4 hover:text-white'
-
   return (
     // reducedMotion="user": people who turn off animations in their OS get no dealing animation
     <MotionConfig reducedMotion="user">
@@ -212,20 +212,17 @@ export default function App() {
         {plan && (
           <header className="mx-auto mb-10 flex max-w-6xl flex-wrap items-center justify-between gap-4">
             <span className="font-display text-2xl font-semibold">Brain Shuffle</span>
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            {/* Kept simple: your chips, the Today sheet, your next card, and a menu for the rest */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
               <ChipCount chips={chips} />
-              <button
-                type="button"
-                aria-pressed={soundOn}
-                aria-label={soundOn ? 'Sound on. Turn sound off.' : 'Sound off. Turn sound on.'}
-                onClick={() => {
-                  sfx.setMuted(soundOn)
-                  setSoundOn(!soundOn)
-                }}
-                className="grid h-9 w-9 place-items-center rounded-[6px] text-white/80 hover:bg-white/10 hover:text-white"
-              >
-                <SoundIcon on={soundOn} />
-              </button>
+              {scheduled.length > 0 && (
+                <button
+                  onClick={() => setShowToday(true)}
+                  className="rounded-[6px] bg-stock px-4 py-2 text-sm font-medium text-ink hover:bg-white/90"
+                >
+                  Today
+                </button>
+              )}
               {nextCard && (
                 <button
                   onClick={() => {
@@ -237,25 +234,20 @@ export default function App() {
                   Draw next card
                 </button>
               )}
-              {played.length > 0 && (
-                <button
-                  onClick={() => setCashingOut(true)}
-                  className="rounded-[6px] border border-white/40 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
-                >
-                  Cash out
-                </button>
-              )}
-              {!addingMore && (
-                <button
-                  onClick={() => setAddingMore(true)}
-                  className="rounded-[6px] bg-stock px-4 py-2 text-sm font-medium text-ink hover:bg-white/90"
-                >
-                  Add more
-                </button>
-              )}
-              <button onClick={startOver} className={link}>
-                Start a new dump
-              </button>
+              <Menu
+                items={[
+                  { label: 'Add more thoughts', onClick: () => setAddingMore(true) },
+                  ...(played.length > 0 ? [{ label: 'Cash out', onClick: () => setCashingOut(true) }] : []),
+                  {
+                    label: soundOn ? 'Turn sound off' : 'Turn sound on',
+                    onClick: () => {
+                      sfx.setMuted(soundOn)
+                      setSoundOn(!soundOn)
+                    },
+                  },
+                  { label: 'Start a new dump', onClick: startOver },
+                ]}
+              />
             </div>
           </header>
         )}
@@ -305,18 +297,11 @@ export default function App() {
                       </motion.span>
                     </p>
                   )}
-                  <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/75">
-                    {Object.entries(SUITS).map(([category, s]) => (
-                      <div key={category} className="flex items-center gap-1.5">
-                        <dt className={s.color === 'text-pip' ? 'text-[#ff9aa8]' : 'text-white'}>{s.symbol}</dt>
-                        <dd>{category}</dd>
-                      </div>
-                    ))}
-                  </dl>
                 </div>
 
-                {/* The table: the card you're looking at, the play zone, and today's plan */}
-                <div className="grid gap-12 lg:grid-cols-[17rem_minmax(0,1fr)_minmax(0,24rem)] lg:gap-10">
+                {/* The table: the card you're looking at, and the felt you play it onto.
+                    Today's schedule lives behind the "Today" button so the table stays simple. */}
+                <div className="grid gap-12 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-14">
                   {selected ? (
                     <Spotlight
                       task={selected}
@@ -328,7 +313,7 @@ export default function App() {
                     />
                   ) : (
                     <p className="font-display text-2xl italic text-white/80">
-                      Your hand is empty. Add more, or start a new dump.
+                      Your hand is empty. Open the menu to add more, or start a new dump.
                     </p>
                   )}
                   <PlayZone
@@ -340,21 +325,6 @@ export default function App() {
                     onSelect={setSelectedId}
                     onPutBack={toggleDone}
                   />
-                  <div>
-                    <Timeline
-                      blocks={blocks}
-                      tasks={scheduled}
-                      startAt={plan.startAt}
-                      finishBy={plan.finishBy}
-                      onStartChange={(startAt) => setPlan((p) => ({ ...p, startAt }))}
-                      onFinishChange={(finishBy) => setPlan((p) => ({ ...p, finishBy }))}
-                      selectedId={selected?.id}
-                      onSelect={setSelectedId}
-                      onToggleDone={toggleDone}
-                      onReorder={reorderToday}
-                      onMove={moveToday}
-                    />
-                  </div>
                 </div>
                 {tasks.length > 0 && (
                   <Hand
@@ -366,7 +336,6 @@ export default function App() {
                     onDragChange={setDragging}
                   />
                 )}
-                <NotTasks notTasks={plan.notTasks} />
                 {plan.source === 'mock' && (
                   <p className="text-sm text-white/55">
                     Sorted offline, without AI. Add an Anthropic API key to use Claude.
@@ -388,6 +357,31 @@ export default function App() {
                 setFocusId(null)
               }}
             />
+          )}
+        </AnimatePresence>
+
+        {/* The Today sheet: your schedule, plus the worries and ideas you set aside */}
+        <AnimatePresence>
+          {plan && showToday && (
+            <SideSheet title="Today" onClose={() => setShowToday(false)}>
+              <Timeline
+                blocks={blocks}
+                tasks={scheduled}
+                startAt={plan.startAt}
+                finishBy={plan.finishBy}
+                onStartChange={(startAt) => setPlan((p) => ({ ...p, startAt }))}
+                onFinishChange={(finishBy) => setPlan((p) => ({ ...p, finishBy }))}
+                selectedId={selected?.id}
+                onSelect={(id) => {
+                  setSelectedId(id)
+                  setShowToday(false) // jump back to the table to see that card
+                }}
+                onToggleDone={toggleDone}
+                onReorder={reorderToday}
+                onMove={moveToday}
+              />
+              <NotTasks notTasks={plan.notTasks} />
+            </SideSheet>
           )}
         </AnimatePresence>
 
@@ -475,21 +469,5 @@ function ChipCount({ chips }) {
       </motion.span>
       <span className="text-sm text-white/70">chips</span>
     </span>
-  )
-}
-
-function SoundIcon({ on }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
-      {on ? (
-        <>
-          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
-          <path d="M18.5 5.5a9 9 0 0 1 0 13" />
-        </>
-      ) : (
-        <path d="m16 9 5 6m0-6-5 6" />
-      )}
-    </svg>
   )
 }
