@@ -13,6 +13,7 @@ import { SUITS } from './components/PlayingCard.jsx'
 import * as sfx from './lib/sfx.js'
 import { sortBrain } from './lib/sortBrain.js'
 import { mergePlan } from './lib/merge.js'
+import { dealerReact } from './lib/dealer.js'
 import { buildTimeline, roundUpTo5 } from './lib/schedule.js'
 import { loadPlan, savePlan, loadDraft, saveDraft } from './lib/storage.js'
 
@@ -35,6 +36,7 @@ export default function App() {
   const [lastWin, setLastWin] = useState(null) // the "+3 chips" that floats up after playing
   const [soundOn, setSoundOn] = useState(() => !sfx.isMuted())
   const [cashingOut, setCashingOut] = useState(false) // the end-of-day recap is open
+  const [dealerLine, setDealerLine] = useState(null) // what the dealer just said about the card you played
   const playZoneRef = useRef(null)
 
   // Everything below is derived from the plan: plan.tasks is the single list we change.
@@ -75,6 +77,7 @@ export default function App() {
       finishBy: null, // optional "I need to be done by" time
     })
     setSelectedId(null)
+    setDealerLine(null)
     setDump('') // it's sorted now, so the draft isn't needed
     setSorting(false)
   }
@@ -89,7 +92,10 @@ export default function App() {
     ])
     const { plan: merged, added } = mergePlan(plan, addition)
     setPlan({ ...merged, source: source === 'mock' ? 'mock' : plan.source })
-    if (added.tasks[0]) setSelectedId(added.tasks[0].id) // show the first new card
+    if (added.tasks[0]) {
+      setSelectedId(added.tasks[0].id) // show the first new card
+      setDealerLine(null) // and let the dealer's new tip show
+    }
     setNotice({
       text:
         added.tasks.length || added.notTasks.length
@@ -108,6 +114,7 @@ export default function App() {
 
   function startOver() {
     setPlan(null)
+    setDealerLine(null)
     setDump('')
     setAddingMore(false)
     setNotice(null)
@@ -129,6 +136,14 @@ export default function App() {
       setLastWin({ key: `${id}-${Date.now()}`, chips: CHIPS[task.priority] })
       // Playing the card you're looking at moves you on to your next most important card.
       if (selected?.id === id) setSelectedId(null)
+      // The dealer reacts and points at your next card (same order as "Draw next card").
+      const left = (ts) => ts.filter((t) => !t.done && t.id !== id)
+      const next = left(scheduled)[0] ?? left(hand)[0]
+      setDealerLine({ key: Date.now(), text: dealerReact(task, next, played.length) })
+      // Last card played: the table is clear, so cash out automatically.
+      if (!next) setTimeout(() => setCashingOut(true), 1300)
+    } else {
+      setDealerLine(null) // putting a card back: go back to the dealer's original tip
     }
   }
 
@@ -246,12 +261,23 @@ export default function App() {
                 </AnimatePresence>
                 {/* The dealer (the AI) gives one line on what to play first */}
                 <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b border-white/15 pb-5">
-                  {plan.dealerNote && (
-                    <p className="max-w-3xl font-display text-2xl leading-snug italic sm:text-[1.7rem]">
+                  {(dealerLine || plan.dealerNote) && (
+                    <p
+                      aria-live="polite"
+                      className="max-w-3xl font-display text-2xl leading-snug italic sm:text-[1.7rem]"
+                    >
                       <span className="mr-2 font-sans text-sm font-medium tracking-normal text-white/60 not-italic">
                         Dealer
                       </span>
-                      {plan.dealerNote}
+                      {/* A new line fades in each time the dealer speaks */}
+                      <motion.span
+                        key={dealerLine?.key ?? 'tip'}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.35 }}
+                      >
+                        {dealerLine?.text ?? plan.dealerNote}
+                      </motion.span>
                     </p>
                   )}
                   <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/75">
@@ -409,7 +435,16 @@ function ChipCount({ chips }) {
           />
         ))}
       </span>
-      <span className="font-display text-lg font-semibold tabular-nums">{chips}</span>
+      {/* The number pops each time it changes */}
+      <motion.span
+        key={chips}
+        initial={{ scale: chips ? 1.6 : 1, color: chips ? '#ffd76a' : '#ffffff' }}
+        animate={{ scale: 1, color: '#ffffff' }}
+        transition={{ duration: 0.6 }}
+        className="inline-block font-display text-lg font-semibold tabular-nums"
+      >
+        {chips}
+      </motion.span>
       <span className="text-sm text-white/70">chips</span>
     </span>
   )
