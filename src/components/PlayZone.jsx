@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import PlayingCard from './PlayingCard.jsx'
+import Capybara from './Capybara.jsx'
 
 // Each played card's resting angle on the pile, from its position, so the pile looks tossed.
 const tilt = (i) => ((i * 53) % 29) - 14
@@ -51,6 +52,9 @@ export default function PlayZone({ zoneRef, dragging, played, chips, lastWin, on
             </AnimatePresence>
           </div>
         )}
+
+        {/* The hidden capybara, peeking over the edge of the circle */}
+        <Capybara />
 
         {/* "+3 chips" floats up from the pile when you play a card */}
         <AnimatePresence>
